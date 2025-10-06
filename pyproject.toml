@@ -1,0 +1,36 @@
+[project]
+name = "open-table-format"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "kyungjunleeme", email = "kyungjunlee.me@gmail.com" }
+]
+requires-python = ">=3.12.11"
+dependencies = [
+    "boto3>=1.40.18",
+    "pandas>=2.3.3",
+    "pyarrow>=21.0.0",
+    "pyiceberg[pyarrow,s3fs]>=0.10.0",
+    "streamlit>=1.50.0",
+]
+
+[project.scripts]
+open-table-format = "open_table_format:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = ["e2e: marks tests that require MinIO/S3 to be running"]
+
+#[tool.uv]  # uv 쓸 때 편의 옵션(선택)
+# workspace를 쓰는 중이면 이 섹션은 생략 가능

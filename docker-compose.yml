@@ -1,0 +1,71 @@
+services:
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_REGION_NAME: us-east-1
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Optional: leave commented if you prefer boto3 init in app
+  # mc:
+  #   image: minio/mc:latest
+  #   container_name: mc
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
+  #   entrypoint: ["/bin/sh", "-lc"]
+  #   command: "mc alias set local http://minio:9000 minioadmin minioadmin && mc mb -p local/iceberg || true && echo 'MinIO ready with bucket: iceberg'"
+
+  app:
+    image: python:3.12-slim
+    container_name: otf-app
+    depends_on:
+      minio:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - .:/app:cached
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: /app/src
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://minio:9000
+      AWS_ENDPOINT: http://minio:9000
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+      AWS_S3_ENDPOINT: http://minio:9000
+      AWS_ALLOW_HTTP: "true"
+      AWS_S3_ADDRESSING_STYLE: path
+      ARROW_S3_ACCESS_KEY: minioadmin
+      ARROW_S3_SECRET_KEY: minioadmin
+      ARROW_S3_REGION: us-east-1
+      ARROW_S3_ENDPOINT: http://minio:9000
+      ARROW_S3_VERIFY_SSL: "false"
+      ARROW_S3_ALLOW_UNSAFE_RENAME: "true"
+      WAREHOUSE: file:///app/warehouse
+      DATAPATH: s3://iceberg/data
+      CATALOG_URI: sqlite:////app/catalog.db
+    command: >-
+      /bin/sh -lc "pip install --no-cache-dir -U pip && \
+      pip install --no-cache-dir streamlit graphviz boto3 pandas pyarrow 'pyiceberg[pyarrow,s3fs,sql-sqlite]>=0.10.0' && \
+      python scripts/bootstrap_minio.py && \
+      streamlit run src/open_table_format/app.py --server.address 0.0.0.0 --server.port 8501"
+    ports:
+      - "8501:8501"
+
+volumes:
+  minio-data:
